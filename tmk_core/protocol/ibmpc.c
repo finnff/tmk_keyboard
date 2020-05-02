@@ -100,46 +100,50 @@ int16_t ibmpc_host_send(uint8_t data)
     dprintf("w%02X ", data);
 
     IBMPC_INT_OFF();
+    idle();
+    wait_us(50);
 
     /* terminate a transmission if we have */
     inhibit();
-    wait_us(100); // 100us [4]p.13, [5]p.50
+    wait_us(52);    // [5]p.54
 
     /* 'Request to Send' and Start bit */
     data_lo();
+    wait_us(52);    // [5]p.54 [clock low]>100us [5]p.50
     clock_hi();
-    WAIT(clock_lo, 10000, 1);   // 10ms [5]p.50
+    WAIT(clock_lo, 15000, 1);   // [5]p.53, -10ms [5]p.50
 
     /* Data bit[2-9] */
     for (uint8_t i = 0; i < 8; i++) {
-        wait_us(15);
+        wait_us(10);
         if (data&(1<<i)) {
             parity = !parity;
             data_hi();
         } else {
             data_lo();
         }
-        WAIT(clock_hi, 50, 2);
-        WAIT(clock_lo, 50, 3);
+        WAIT(clock_hi, 100, 2);
+        WAIT(clock_lo, 100, 3);
     }
 
     /* Parity bit */
-    wait_us(15);
+    wait_us(10);
     if (parity) { data_hi(); } else { data_lo(); }
-    WAIT(clock_hi, 50, 4);
-    WAIT(clock_lo, 50, 5);
+    WAIT(clock_hi, 100, 4);
+    WAIT(clock_lo, 100, 5);
 
     /* Stop bit */
-    wait_us(15);
+    wait_us(10);
     data_hi();
+    WAIT(clock_hi, 100, 6);
+    WAIT(clock_lo, 100, 7);
 
     /* Ack */
-    WAIT(data_lo, 50, 6);
-    WAIT(clock_lo, 50, 7);
+    WAIT(data_lo, 100, 8);
 
     /* wait for idle state */
-    WAIT(clock_hi, 50, 8);
-    WAIT(data_hi, 50, 9);
+    WAIT(clock_hi, 100, 9);
+    WAIT(data_hi, 100, 10);
 
     // clear buffer to get response correctly
     recv_data = 0xFFFF;
@@ -293,6 +297,8 @@ ISR(IBMPC_INT_VECT)
         case 0b01010000:
         case 0b11010000:
             // AT-done
+            // DO NOT check stop bit. Zenith Z-150(AT) asserts stop bit as low for no reason.
+            // https://github.com/tmk/tmk_keyboard/wiki/IBM-PC-AT-Keyboard-Protocol#zenith-z-150-beige
             // TODO: parity check?
             isr_state = isr_state>>6;
             ibmpc_protocol = IBMPC_PROTOCOL_AT;
@@ -334,6 +340,7 @@ NEXT:
 /* send LED state to keyboard */
 void ibmpc_host_set_led(uint8_t led)
 {
-    ibmpc_host_send(0xED);
-    ibmpc_host_send(led);
+    if (0xFA == ibmpc_host_send(0xED)) {
+        ibmpc_host_send(led);
+    }
 }
