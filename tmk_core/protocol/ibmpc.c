@@ -105,11 +105,11 @@ int16_t ibmpc_host_send(uint8_t data)
 
     /* terminate a transmission if we have */
     inhibit();
-    wait_us(52);    // [5]p.54
+    wait_us(300);    // [5]p.54
 
     /* 'Request to Send' and Start bit */
     data_lo();
-    wait_us(52);    // [5]p.54 [clock low]>100us [5]p.50
+    wait_us(300);    // [5]p.54 [clock low]>100us [5]p.50
     clock_hi();
     WAIT(clock_lo, 15000, 1);   // [5]p.53, -10ms [5]p.50
 
