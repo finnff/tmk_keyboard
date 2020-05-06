@@ -52,6 +52,7 @@ static int16_t read_wait(uint16_t wait_ms)
 
 static uint16_t read_keyboard_id(void)
 {
+/* for Z-150 test
     uint16_t id = 0;
     int16_t  code = 0;
 
@@ -77,6 +78,8 @@ DONE:
     //code = ibmpc_host_send(0xF4);
 
     return id;
+*/
+    return 0x0000;
 }
 
 void hook_early_init(void)
@@ -107,6 +110,10 @@ void matrix_init(void)
  */
 uint16_t keyboard_id = 0x0000;
 keyboard_kind_t keyboard_kind = NONE;
+/*
+static uint8_t led_status = 0; // Z-150 test
+static void _led_set(uint8_t usb_led);  // Z-150 test
+*/
 uint8_t matrix_scan(void)
 {
     // scan code reading states
@@ -270,9 +277,10 @@ uint8_t matrix_scan(void)
                 case PC_XT:
                     break;
                 case PC_AT:
-                    led_set(host_keyboard_leds());
+                    //led_set(host_keyboard_leds());
                     break;
                 case PC_TERMINAL:
+                    led_set(host_keyboard_leds());
                     // Set all keys to make/break type
                     ibmpc_host_send(0xF8);
                     break;
@@ -295,6 +303,16 @@ uint8_t matrix_scan(void)
                 default:
                     break;
             }
+
+/*
+            // Z-150 test
+            // update LED
+            if (led_status != host_keyboard_leds()) {
+                led_status = host_keyboard_leds();
+                _led_set(led_status);
+            }
+*/
+
             break;
         default:
             break;
@@ -345,8 +363,10 @@ void matrix_clear(void)
     for (uint8_t i=0; i < MATRIX_ROWS; i++) matrix[i] = 0x00;
 }
 
-void led_set(uint8_t usb_led)
+// Z-150 test
+static void _led_set(uint8_t usb_led)
 {
+    if (keyboard_kind == NONE) return;
     //if (keyboard_kind != PC_AT) return;
 
     uint8_t ibmpc_led = 0;
@@ -356,7 +376,17 @@ void led_set(uint8_t usb_led)
         ibmpc_led |= (1<<IBMPC_LED_NUM_LOCK);
     if (usb_led &  (1<<USB_LED_CAPS_LOCK))
         ibmpc_led |= (1<<IBMPC_LED_CAPS_LOCK);
+
     ibmpc_host_set_led(ibmpc_led);
+    if (ibmpc_error) {
+        xprintf("\nERR:%02X\n", ibmpc_error);
+        ibmpc_error = IBMPC_ERR_NONE;
+    }
+}
+
+void led_set(uint8_t usb_led)
+{
+    _led_set(usb_led);
 }
 
 
